@@ -42,29 +42,56 @@ if uploaded_file:
         priorities = []
 
         progress_bar = st.progress(0)
+        status_text = st.empty()
+
 
         with st.spinner("Analyzing feedback with AI..."):
 
             total_rows = len(df)
 
-            for index, feedback in enumerate(df["feedback"]):
+        batch_size = 5
+
+        with st.spinner("Analyzing feedback with AI..."):
+
+            for i in range(0, total_rows, batch_size):
+
+                batch_df = df.iloc[i:i + batch_size]
+
+                feedbacks = batch_df["feedback"].tolist()
+
+                combined_feedback = ""
+
+                for idx, feedback in enumerate(feedbacks, start=1):
+
+                    combined_feedback += f"""
+                    Feedback {idx}:
+                    {feedback}
+
+                    """
 
                 prompt = f"""
-                Analyze this customer feedback.
+                Analyze EACH feedback separately.
 
-                Return ONLY in this format:
+                Return ONLY in this exact format:
 
                 Summary: ...
                 Sentiment: Positive/Negative/Neutral
                 Priority: High/Medium/Low
 
-                Feedback:
-                {feedback}
+                Separate every feedback using:
+
+                ---
+
+                Customer Feedbacks:
+
+                {combined_feedback}
                 """
 
-                success = False
+                result = ""
 
-                while not success:
+                # Retry
+
+                for attempt in range(5):
 
                     try:
 
@@ -75,51 +102,76 @@ if uploaded_file:
 
                         result = response.text.strip()
 
-                        success = True
+                        status_text.text(
+                            f"✅ Batch {i//batch_size + 1} processed"
+                        )
+
+                        break
 
                     except Exception as e:
 
-                        st.warning(
-                            "⚠ API overloaded. Retrying in 5 seconds..."
+                        status_text.text(
+                            f"⚠ API busy... Retry {attempt + 1}/5"
                         )
 
                         time.sleep(5)
 
-                # Slow down requests slightly
+                # Split
+
+                sections = result.split("---")
+
+                for section in sections:
+
+                    try:
+
+                        lines = section.strip().split("\n")
+
+                        summary = lines[0].replace(
+                            "Summary:", ""
+                        ).strip()
+
+                        sentiment = lines[1].replace(
+                            "Sentiment:", ""
+                        ).strip()
+
+                        priority = lines[2].replace(
+                            "Priority:", ""
+                        ).strip()
+
+                    except:
+
+                        summary = "Parsing Error"
+                        sentiment = "Unknown"
+                        priority = "Unknown"
+
+                    summaries.append(summary)
+                    sentiments.append(sentiment)
+                    priorities.append(priority)
+
+                # Slight delay
                 time.sleep(2)
 
-                # Parse Response
+                # Progress
 
-                try:
+                current_progress = min(
+                    (i + batch_size) / total_rows,
+                    1.0
+                )
 
-                    lines = result.split("\n")
+                progress_bar.progress(current_progress)
 
-                    summary = lines[0].replace(
-                        "Summary:", ""
-                    ).strip()
+        while len(summaries) < total_rows:
+            summaries.append("Missing")
 
-                    sentiment = lines[1].replace(
-                        "Sentiment:", ""
-                    ).strip()
+        while len(sentiments) < total_rows:
+            sentiments.append("Unknown")
 
-                    priority = lines[2].replace(
-                        "Priority:", ""
-                    ).strip()
+        while len(priorities) < total_rows:
+            priorities.append("Unknown")
 
-                except:
-
-                    summary = "Parsing Error"
-                    sentiment = "Unknown"
-                    priority = "Unknown"
-
-                summaries.append(summary)
-                sentiments.append(sentiment)
-                priorities.append(priority)
-
-                # Progress Bar
-
-                progress = (index + 1) / total_rows
-                progress_bar.progress(progress)
+        summaries = summaries[:total_rows]
+        sentiments = sentiments[:total_rows]
+        priorities = priorities[:total_rows]
 
         # Add Columns
 
