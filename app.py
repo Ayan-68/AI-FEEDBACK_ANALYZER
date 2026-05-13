@@ -2,6 +2,7 @@ from google import genai
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
+import time
 
 # Page title
 
@@ -33,16 +34,20 @@ if uploaded_file:
     st.subheader("📄 Uploaded Data")
     st.dataframe(df)
 
-    # Analyze button
+    # Analyze Button
     if st.button("Analyze Feedback"):
 
         summaries = []
         sentiments = []
         priorities = []
 
+        progress_bar = st.progress(0)
+
         with st.spinner("Analyzing feedback with AI..."):
 
-            for feedback in df["feedback"]:
+            total_rows = len(df)
+
+            for index, feedback in enumerate(df["feedback"]):
 
                 prompt = f"""
                 Analyze this customer feedback.
@@ -57,14 +62,36 @@ if uploaded_file:
                 {feedback}
                 """
 
-                response = client.models.generate_content(
-                    model="gemini-3.1-flash-lite",
-                    contents=prompt
-                )
+                success = False
 
-                result = response.text.strip()
+                while not success:
+
+                    try:
+
+                        response = client.models.generate_content(
+                            model="gemini-3.1-flash-lite",
+                            contents=prompt
+                        )
+
+                        result = response.text.strip()
+
+                        success = True
+
+                    except Exception as e:
+
+                        st.warning(
+                            "⚠ API overloaded. Retrying in 5 seconds..."
+                        )
+
+                        time.sleep(5)
+
+                # Slow down requests slightly
+                time.sleep(2)
+
+                # Parse Response
 
                 try:
+
                     lines = result.split("\n")
 
                     summary = lines[0].replace(
@@ -80,6 +107,7 @@ if uploaded_file:
                     ).strip()
 
                 except:
+
                     summary = "Parsing Error"
                     sentiment = "Unknown"
                     priority = "Unknown"
@@ -88,7 +116,13 @@ if uploaded_file:
                 sentiments.append(sentiment)
                 priorities.append(priority)
 
-        # Add new columns
+                # Progress Bar
+
+                progress = (index + 1) / total_rows
+                progress_bar.progress(progress)
+
+        # Add Columns
+
         df["summary"] = summaries
         df["sentiment"] = sentiments
         df["priority"] = priorities
@@ -96,6 +130,7 @@ if uploaded_file:
         st.success("✅ Analysis Complete!")
 
         # Metrics
+
         positive_count = (
             df["sentiment"] == "Positive"
         ).sum()
@@ -115,6 +150,7 @@ if uploaded_file:
         col3.metric("Neutral", neutral_count)
 
         # Chart
+
         st.subheader("📊 Sentiment Analysis")
 
         fig, ax = plt.subplots()
@@ -126,11 +162,14 @@ if uploaded_file:
 
         st.pyplot(fig)
 
-        # Show final dataframe
+        # Final Data
+
         st.subheader("📋 Analyzed Data")
+
         st.dataframe(df)
 
-        # Download button
+        # Download Results
+
         csv = df.to_csv(index=False)
 
         st.download_button(
