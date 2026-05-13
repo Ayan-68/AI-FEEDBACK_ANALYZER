@@ -18,7 +18,7 @@ Upload a CSV file and let AI analyze customer feedback automatically.
 """)
 
 client = genai.Client(
-    api_key="YOUR_API_KEY"
+    api_key=st.secrets["GEMINI_API_KEY"]
 )
 
 uploaded_file = st.file_uploader(
