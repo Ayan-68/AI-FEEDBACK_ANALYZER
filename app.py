@@ -1,8 +1,9 @@
-from google import genai
+from groq import Groq
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import time
+
 
 # Page title
 
@@ -18,8 +19,8 @@ st.markdown("""
 Upload a CSV file and let AI analyze customer feedback automatically.
 """)
 
-client = genai.Client(
-    api_key=st.secrets["GEMINI_API_KEY"]
+client = Groq(
+    api_key=st.secrets["GROQ_API_KEY"]
 )
 
 uploaded_file = st.file_uploader(
@@ -68,13 +69,17 @@ if uploaded_file:
 
                     try:
 
-                        response = client.models.generate_content(
-                            model="gemini-3.1-flash-lite",
-                            contents=prompt
+                        response = client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": prompt
+                                }
+                            ]
                         )
 
-                        result = response.text.strip()
-
+                        result = response.choices[0].message.content.strip()
                         success = True
 
                     except Exception as e:
