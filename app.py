@@ -20,7 +20,7 @@ Upload a CSV file and let AI analyze customer feedback automatically.
 """)
 
 client = Groq(
-    api_key=st.secrets["GROQ_API_KEY"]
+    api_key=st.secrets["API_KEY"]
 )
 
 uploaded_file = st.file_uploader(
